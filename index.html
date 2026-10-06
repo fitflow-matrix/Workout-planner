@@ -185,7 +185,9 @@
   .bar>i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s;}
   .checks{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0 8px;font-size:13.5px;color:var(--text-dim);}
   .checks label{display:flex;gap:6px;align-items:center;cursor:pointer;}
-  .s-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .s-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);cursor:grab;}
+  .s-item:active{cursor:grabbing;}
+  .s-item.dragging{opacity:0.4;}
   .tag{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;font-weight:600;}
   .ph-sel{padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);font-size:11.5px;margin-right:4px;flex:none;}
   .li-add{background:none;border:none;color:var(--accent);cursor:pointer;font-size:20px;padding:4px 8px;}
@@ -194,6 +196,9 @@
   .timer{font-family:'Space Grotesk',sans-serif;font-size:64px;font-weight:700;}
   #toast{position:fixed;top:12px;left:50%;transform:translateX(-50%);max-width:92vw;background:var(--accent);color:var(--accent-text);padding:12px 16px;border-radius:var(--radius);font-weight:600;font-size:14px;z-index:20;display:none;cursor:pointer;}
   details summary{cursor:pointer;line-height:1.5;}
+  .star-btn{background:none;border:none;cursor:pointer;font-size:16px;padding:0 2px;color:var(--text-dim);}
+  .star-btn.active{color:var(--accent);}
+  .template-box{display:flex;gap:8px;align-items:center;margin-top:8px;}
 </style>
 </head>
 <body>
@@ -227,6 +232,15 @@
   </div>
 
   <section>
+    <div class="label">Vorlagen</div>
+    <div class="row">
+      <select id="template-select"><option value="">Gespeicherte Vorlagen laden...</option></select>
+      <button class="btn-ghost" id="load-template-btn">Laden</button>
+      <button class="btn-ghost" id="save-template-btn">Aktuelles als Vorlage</button>
+    </div>
+  </section>
+
+  <section>
     <div class="label">Art</div>
     <div class="chips" id="chips-art"></div>
   </section>
@@ -244,6 +258,13 @@
   <section>
     <div class="label">Teil</div>
     <div class="chips" id="chips-phase"></div>
+  </section>
+
+  <section>
+    <div class="label">Filter & Favoriten</div>
+    <div class="chips">
+      <div class="chip" id="fav-filter-chip">★ Nur Favoriten</div>
+    </div>
   </section>
 
   <section>
@@ -366,12 +387,11 @@
 </div>
 
 <script type="module">
-// --- Supabase-Speicher (ersetzt Firebase/Firestore) ---
+// --- Supabase-Speicher ---
 const SUPABASE_URL = "https://ldcmpdpomvjtloavcbfa.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkY21wZHBvbXZqdGxvYXZjYmZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1OTE1MTgsImV4cCI6MjEwNTE2NzUxOH0.IoKOfRvO65vX8nXst8-wsh1UoiuM5TGEs6cuQhT3J5g";
 const REST_URL = SUPABASE_URL + "/rest/v1/trainingsauswahl";
 
-// --- Login (Supabase Auth, E-Mail + Passwort) ---
 const SESSION_KEY = "trainingsauswahl-session";
 let session = null;
 
@@ -449,7 +469,6 @@ async function writeRow(fullData){
   if(!res.ok) throw new Error("Supabase-Schreibfehler: " + res.status);
 }
 
-// gleiche get/set-Schnittstelle wie vorher, jetzt gegen Supabase statt Firestore
 const storage = {
   async get(key){
     const data = await fetchRow();
@@ -470,29 +489,39 @@ const INTENSITAET_COLOR = {niedrig:"var(--low)", mittel:"var(--mid)", hoch:"var(
 const PHASE_ORDER = ["Warm-up","Hauptteil","Cool-down","Stretching"];
 
 const STARTER_DATA = [
-  {id:crypto.randomUUID(), name:"Kettlebell Flow (Beispiel – bitte anpassen)", art:"Kettlebell", quelle:"YouTube", dauer:20, intensitaet:"mittel", trainer:"", link:""},
-  {id:crypto.randomUUID(), name:"HIIT Sprint Intervalle (Beispiel)", art:"HIIT", quelle:"Nike Training Club", dauer:25, intensitaet:"hoch", trainer:"", link:""},
-  {id:crypto.randomUUID(), name:"Jump Rope Basics (Beispiel)", art:"Cardio", quelle:"Crossrope", dauer:15, intensitaet:"mittel", trainer:"", link:""},
-  {id:crypto.randomUUID(), name:"Ganzkörper Kraft (Beispiel)", art:"Kraft", quelle:"FitOn", dauer:30, intensitaet:"mittel", trainer:"", link:""}
+  {id:crypto.randomUUID(), name:"Kettlebell Flow (Beispiel – bitte anpassen)", art:"Kettlebell", quelle:"YouTube", dauer:20, intensitaet:"mittel", trainer:"", link:"", fav:false, rating:0},
+  {id:crypto.randomUUID(), name:"HIIT Sprint Intervalle (Beispiel)", art:"HIIT", quelle:"Nike Training Club", dauer:25, intensitaet:"hoch", trainer:"", link:"", fav:false, rating:0},
+  {id:crypto.randomUUID(), name:"Jump Rope Basics (Beispiel)", art:"Cardio", quelle:"Crossrope", dauer:15, intensitaet:"mittel", trainer:"", link:"", fav:false, rating:0},
+  {id:crypto.randomUUID(), name:"Ganzkörper Kraft (Beispiel)", art:"Kraft", quelle:"FitOn", dauer:30, intensitaet:"mittel", trainer:"", link:"", fav:false, rating:0}
 ];
 
 let workouts = [];
 let scheduled = [];
 let plan = [];
 let hist = [];
+let templates = [];
 let goal = {sessions:0, minutes:0};
 let run = null;
-let filters = {art:new Set(), quelle:new Set(), intensitaet:new Set(), phase:new Set(), min:null, max:null, trainer:""};
+let filters = {art:new Set(), quelle:new Set(), intensitaet:new Set(), phase:new Set(), min:null, max:null, trainer:"", onlyFav:false};
 
 async function loadScheduled(){
   try{
     const res = await storage.get('scheduled');
     scheduled = res ? JSON.parse(res.value) : [];
-  }catch(e){ console.error('Laden der Termine fehlgeschlagen', e); scheduled = []; }
+  }catch(e){ console.error(e); scheduled = []; }
 }
 async function saveScheduled(){
-  try{ await storage.set('scheduled', JSON.stringify(scheduled)); }
-  catch(e){ console.error('Speichern der Termine fehlgeschlagen', e); }
+  try{ await storage.set('scheduled', JSON.stringify(scheduled)); } catch(e){ console.error(e); }
+}
+
+async function loadTemplates(){
+  try{
+    const res = await storage.get('templates');
+    templates = res ? JSON.parse(res.value) : [];
+  }catch(e){ templates = []; }
+}
+async function saveTemplates(){
+  try{ await storage.set('templates', JSON.stringify(templates)); } catch(e){}
 }
 
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -544,8 +573,10 @@ function showToast(msg){
   showToast.t = setTimeout(()=>{ t.style.display='none'; }, 9000);
 }
 
-// ----- Mein Workout (Zusammenstellung) -----
+// ----- Mein Workout & Drag & Drop -----
 function addToPlan(w){ plan = sortPlan([...plan, snap(w)]); renderPlan(); }
+
+let draggedIdx = null;
 function renderPlan(){
   const r = document.getElementById('result');
   const tot = total(plan);
@@ -556,9 +587,24 @@ function renderPlan(){
   plan.forEach((x,i)=>{
     const d = document.createElement('div');
     d.className = 's-item';
+    d.draggable = true;
+    d.dataset.idx = i;
     d.innerHTML = `<div class="li-main"><div class="tag">${esc(x.phase)}</div><div class="li-name">${esc(x.name)}</div>
-      <div class="li-meta">${esc(x.art)} · ${esc(x.quelle)} · ${x.dauer} Min${x.intensitaet ? ' · '+esc(x.intensitaet) : ''}${x.trainer ? ' · '+esc(x.trainer) : ''}</div></div>
+      <div class="li-meta">${esc(x.art)} · ${esc(x.quelle)} ·${x.dauer} Min${x.intensitaet ? ' · '+esc(x.intensitaet) : ''}${x.trainer ? ' · '+esc(x.trainer) : ''}</div></div>
       <div style="flex-shrink:0">${x.link ? `<a class="up-btn" target="_blank" rel="noopener" href="${esc(x.link)}">Öffnen</a> ` : ''}<button class="li-del">×</button></div>`;
+    
+    d.addEventListener('dragstart', e=>{ draggedIdx = i; e.dataTransfer.setData('text/plain', i); d.classList.add('dragging'); });
+    d.addEventListener('dragend', ()=>{ d.classList.remove('dragging'); draggedIdx = null; });
+    d.addEventListener('dragover', e=> e.preventDefault());
+    d.addEventListener('drop', e=>{
+      e.preventDefault();
+      if(draggedIdx === null || draggedIdx === i) return;
+      const item = plan.splice(draggedIdx, 1)[0];
+      plan.splice(i, 0, item);
+      draggedIdx = null;
+      renderPlan();
+    });
+
     d.querySelector('.li-del').onclick = ()=>{ plan.splice(i,1); renderPlan(); };
     el.appendChild(d);
   });
@@ -566,13 +612,40 @@ function renderPlan(){
   document.getElementById('sbar-txt').textContent = 'Mein Workout: ' + plan.length + ' · ' + tot + ' Min';
 }
 
+// ----- Vorlagen -----
+function renderTemplateSelect(){
+  const sel = document.getElementById('template-select');
+  sel.innerHTML = '<option value="">Gespeicherte Vorlagen laden...</option>' + templates.map((t, idx)=>`<option value="${idx}">${esc(t.name)} (${t.items.length} Teile)</option>`).join('');
+}
+
+document.getElementById('save-template-btn').onclick = async ()=>{
+  if(!plan.length){ showToast('Dein Plan ist leer.'); return; }
+  const name = prompt('Name für diese Vorlage (z.B. Montag-Standard):');
+  if(!name || !name.trim()) return;
+  templates.push({name: name.trim(), items: plan.map(x=>({...x}))});
+  await saveTemplates();
+  renderTemplateSelect();
+  showToast('Vorlage gespeichert!');
+};
+
+document.getElementById('load-template-btn').onclick = ()=>{
+  const idx = document.getElementById('template-select').value;
+  if(idx === '') return;
+  const t = templates[idx];
+  if(!t) return;
+  plan = t.items.map(x=>({...x}));
+  renderPlan();
+  document.getElementById('result').scrollIntoView({behavior:'smooth', block:'nearest'});
+  showToast(`Vorlage "${t.name}" geladen.`);
+};
+
 // ----- Geplante Workouts, Countdown, Erinnerung -----
 function fmtLeft(ms){
   const s = Math.floor(ms/1000);
   if(s <= 0) return 'Startzeit erreicht';
   if(s < 3600) return 'in ' + pad(Math.floor(s/60)) + ':' + pad(s%60);
   const hh = Math.floor(s/3600), d = Math.floor(hh/24);
-  return d ? `in ${d} T ${hh%24} Std` : `in ${hh} Std ${Math.floor(s%3600/60)} Min`;
+  return d ? `in ${d} T${hh%24} Std` : `in ${hh} Std${Math.floor(s%3600/60)} Min`;
 }
 function tick(){
   const now = Date.now();
@@ -629,7 +702,7 @@ function renderUpcoming(){
   tick();
 }
 
-// ----- Workout durchführen -----
+// ----- Workout durchführen & Bewerten -----
 function startRun(items, schedId){
   if(!items.length) return;
   run = {items: items.map(x=>({...x})), i:0, schedId, done:[], end:0, t:null};
@@ -640,7 +713,7 @@ function runStep(){
   const x = run.items[run.i];
   run.end = Date.now() + (x.dauer||0)*60000;
   run.buzzed = false;
-  document.getElementById('r-step').textContent = `Teil ${run.i+1} von ${run.items.length} · ${x.phase}`;
+  document.getElementById('r-step').textContent = `Teil ${run.i+1} von ${run.items.length} ·${x.phase}`;
   document.getElementById('r-name').textContent = x.name;
   document.getElementById('r-meta').textContent = [x.art, x.quelle, x.trainer].filter(Boolean).join(' · ');
   const a = document.getElementById('r-link');
@@ -670,10 +743,10 @@ async function finishRun(){
 // ----- Historie -----
 async function loadHist(){
   try{ const r = await storage.get('history'); hist = r ? JSON.parse(r.value) : []; }
-  catch(e){ console.error(e); hist = []; }
+  catch(e){ hist = []; }
 }
 async function saveHist(){
-  try{ await storage.set('history', JSON.stringify(hist)); } catch(e){ console.error(e); }
+  try{ await storage.set('history', JSON.stringify(hist)); } catch(e){}
 }
 function renderHistory(){
   const el = document.getElementById('hist-list');
@@ -692,338 +765,4 @@ function renderHistory(){
     const box = document.createElement('div');
     box.style.cssText = 'border-bottom:1px solid var(--border);padding:10px 4px';
     box.innerHTML = `<details><summary><span class="li-name">${esc(e.name)}</span> <span class="li-meta">· ${e.dauer} Min · ${d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</span></summary><div class="hbody"></div></details>
-      <div class="result-actions" style="margin-top:8px"><button class="btn-ghost" data-a="all">Komplett wiederholen</button><button class="btn-ghost" data-a="del">Löschen</button></div>`;
-    const body = box.querySelector('.hbody');
-    e.items.forEach(x=>{
-      const r = document.createElement('div');
-      r.className = 's-item';
-      r.innerHTML = `<div class="li-main"><span class="tag">${esc(x.phase)}</span> <span class="li-name">${esc(x.name)}</span><div class="li-meta">${x.dauer} Min</div></div><button class="up-btn">+ Teil</button>`;
-      r.querySelector('button').onclick = ()=>{ plan = sortPlan([...plan, {...x}]); renderPlan(); };
-      body.appendChild(r);
-    });
-    box.querySelector('[data-a="all"]').onclick = ()=>{
-      plan = sortPlan(e.items.map(x=>({...x}))); renderPlan();
-      document.getElementById('result').scrollIntoView({behavior:'smooth', block:'nearest'});
-    };
-    box.querySelector('[data-a="del"]').onclick = async ()=>{
-      if(!confirm('Diesen Historien-Eintrag löschen?')) return;
-      hist = hist.filter(x=>x.id !== e.id);
-      await saveHist(); renderHistory(); renderGoal();
-    };
-    el.appendChild(box);
-  });
-}
-
-// ----- Wochenziel -----
-async function loadGoal(){
-  try{ const r = await storage.get('goal'); goal = r ? JSON.parse(r.value) : {sessions:0, minutes:0}; }
-  catch(e){ console.error(e); }
-  document.getElementById('goal-sessions').value = goal.sessions || '';
-  document.getElementById('goal-minutes').value = goal.minutes || '';
-}
-async function saveGoalData(){
-  try{ await storage.set('goal', JSON.stringify(goal)); } catch(e){ console.error(e); }
-}
-function renderGoal(){
-  const ws = new Date(); ws.setHours(0,0,0,0); ws.setDate(ws.getDate() - ((ws.getDay()+6)%7));
-  const wk = hist.filter(e=> new Date(e.at) >= ws);
-  const n = wk.length, m = total(wk);
-  const st = document.getElementById('goal-status'), left = document.getElementById('goal-left'), bar = document.getElementById('goal-bar');
-  const parts = [], ratios = [], miss = [];
-  if(goal.sessions){ parts.push(`${n} von ${goal.sessions} Einheiten`); ratios.push(n/goal.sessions); if(n < goal.sessions) miss.push(`${goal.sessions-n} Einheit(en)`); }
-  if(goal.minutes){ parts.push(`${m} von ${goal.minutes} Min`); ratios.push(m/goal.minutes); if(m < goal.minutes) miss.push(`${goal.minutes-m} Min`); }
-  if(!parts.length){ st.textContent = `Diese Woche: ${n} Einheiten · ${m} Min. Lege unten ein Ziel fest.`; left.textContent = ''; bar.style.width = '0'; return; }
-  st.textContent = 'Diese Woche: ' + parts.join(' · ');
-  bar.style.width = Math.min(100, Math.round(Math.min(...ratios)*100)) + '%';
-  const daysLeft = 7 - ((new Date().getDay()+6)%7);
-  let txt = miss.length ? `Noch ${miss.join(' und ')} bis zum Ziel – ${daysLeft} Tag${daysLeft===1?'':'e'} übrig (inkl. heute).` : 'Wochenziel erreicht!';
-  if(goal.minutes && m < goal.minutes) txt += ` Das sind ca. ${Math.ceil((goal.minutes-m)/daysLeft)} Min pro Tag.`;
-  left.textContent = txt;
-}
-
-function pickRandom(){
-  let pool = workouts.filter(matches);
-  if(!filters.phase.size) pool = pool.filter(w=> ph(w) === 'Hauptteil');
-  if(!pool.length){ showToast('Keine Treffer mit diesen Filtern'); return; }
-  const parts = [rnd(pool)], missing = [];
-  document.querySelectorAll('.extra:checked').forEach(c=>{
-    const p = workouts.filter(w=> ph(w) === c.value);
-    if(p.length) parts.push(rnd(p)); else missing.push(c.value);
-  });
-  plan = sortPlan(parts.map(snap));
-  renderPlan();
-  if(missing.length) showToast('Noch keine Einträge für: ' + missing.join(', '));
-  document.getElementById('result').scrollIntoView({behavior:'smooth', block:'nearest'});
-}
-
-async function loadWorkouts(){
-  try{
-    const res = await storage.get('workouts');
-    workouts = res ? JSON.parse(res.value) : STARTER_DATA;
-    if(!res){ await storage.set('workouts', JSON.stringify(workouts)); }
-  }catch(e){
-    console.error('Laden der Workouts fehlgeschlagen', e);
-    workouts = STARTER_DATA;
-  }
-}
-async function saveWorkouts(){
-  try{ await storage.set('workouts', JSON.stringify(workouts)); }
-  catch(e){ console.error('Speichern fehlgeschlagen', e); }
-}
-
-function renderChips(containerId, options, key){
-  const el = document.getElementById(containerId);
-  el.innerHTML = '';
-  options.forEach(opt=>{
-    const chip = document.createElement('div');
-    chip.className = 'chip' + (filters[key].has(opt) ? ' active' : '');
-    chip.textContent = opt;
-    chip.onclick = ()=>{
-      if(filters[key].has(opt)) filters[key].delete(opt);
-      else filters[key].add(opt);
-      renderChips(containerId, options, key);
-      updateMatchCount();
-    };
-    el.appendChild(chip);
-  });
-}
-
-function renderTrainerSelect(){
-  const sel = document.getElementById('trainer-select');
-  const trainers = [...new Set(workouts.map(w=>w.trainer).filter(Boolean))].sort();
-  sel.innerHTML = '<option value="">Alle</option>' + trainers.map(t=>`<option value="${t}">${t}</option>`).join('');
-  sel.value = filters.trainer;
-}
-
-function matches(w){
-  if(filters.art.size && !filters.art.has(w.art)) return false;
-  if(filters.quelle.size && !filters.quelle.has(w.quelle)) return false;
-  if(filters.intensitaet.size && !filters.intensitaet.has(w.intensitaet)) return false;
-  if(filters.min!==null && !isNaN(filters.min) && w.dauer < filters.min) return false;
-  if(filters.max!==null && !isNaN(filters.max) && w.dauer > filters.max) return false;
-  if(filters.trainer && w.trainer !== filters.trainer) return false;
-  if(filters.phase.size && !filters.phase.has(ph(w))) return false;
-  return true;
-}
-
-function updateMatchCount(){
-  const n = workouts.filter(matches).length;
-  document.getElementById('match-count').textContent =
-    n === 0 ? 'Keine Treffer mit diesen Filtern' :
-    n === 1 ? '1 Workout passt' : n + ' Workouts passen';
-  renderList();
-}
-
-function renderList(){
-  const listEl = document.getElementById('list');
-  const filtered = workouts.filter(matches);
-  document.getElementById('list-label').textContent =
-    (filtered.length === workouts.length) ? `Alle Einträge (${workouts.length})` : `Gefiltert (${filtered.length} von ${workouts.length})`;
-  if(filtered.length === 0){
-    listEl.innerHTML = '<div class="empty">Keine Einträge in dieser Auswahl.</div>';
-    return;
-  }
-  listEl.innerHTML = '';
-  filtered.forEach(w=>{
-    const item = document.createElement('div');
-    item.className = 'list-item';
-    item.innerHTML = `
-      <div class="li-main">
-        <div class="li-name">${w.name}</div>
-        <div class="li-meta"><span class="dot" style="background:${INTENSITAET_COLOR[w.intensitaet]}"></span>${w.art} · ${w.quelle} · ${w.dauer} Min${w.trainer ? ' · '+w.trainer : ''}</div>
-      </div>
-      <div style="display:flex;align-items:center;flex-shrink:0">
-        <select class="ph-sel">${PHASE_ORDER.map(p=>`<option${p===ph(w)?' selected':''}>${p}</option>`).join('')}</select>
-        <button class="li-add" title="Zum Workout hinzufügen">+</button>
-        <button class="li-del" data-id="${w.id}">×</button>
-      </div>
-    `;
-    item.querySelector('.ph-sel').onchange = async e=>{ w.phase = e.target.value; await saveWorkouts(); updateMatchCount(); };
-    item.querySelector('.li-add').onclick = ()=> addToPlan(w);
-    item.querySelector('.li-del').onclick = async ()=>{
-      workouts = workouts.filter(x=>x.id !== w.id);
-      await saveWorkouts();
-      renderTrainerSelect();
-      updateMatchCount();
-    };
-    listEl.appendChild(item);
-  });
-}
-
-document.getElementById('dauer-min').oninput = e=>{ filters.min = e.target.value===''? null : Number(e.target.value); updateMatchCount(); };
-document.getElementById('dauer-max').oninput = e=>{ filters.max = e.target.value===''? null : Number(e.target.value); updateMatchCount(); };
-document.getElementById('trainer-select').onchange = e=>{ filters.trainer = e.target.value; updateMatchCount(); };
-document.getElementById('pick-btn').onclick = pickRandom;
-document.getElementById('reroll-btn').onclick = pickRandom;
-
-document.getElementById('schedule-btn').onclick = async ()=>{
-  const val = document.getElementById('schedule-input').value;
-  if(!val || !plan.length) return;
-  const remind = Number(document.getElementById('remind-sel').value);
-  if(remind && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
-  scheduled.push({id:crypto.randomUUID(), name:sessName(plan), items:plan.map(x=>({...x})), dauer:total(plan), when:val, remind});
-  await saveScheduled();
-  renderUpcoming();
-  document.getElementById('schedule-input').value = '';
-};
-document.getElementById('start-btn').onclick = ()=> startRun(plan);
-document.getElementById('clear-btn').onclick = ()=>{ plan = []; renderPlan(); };
-document.getElementById('sbar-go').onclick = ()=> document.getElementById('result').scrollIntoView({behavior:'smooth', block:'center'});
-document.getElementById('r-next').onclick = async ()=>{
-  run.done.push(run.items[run.i]);
-  if(run.i < run.items.length-1){ run.i++; runStep(); return; }
-  await finishRun();
-};
-document.getElementById('r-cancel').onclick = ()=>{
-  if(!confirm('Workout abbrechen? Es wird nicht in der Historie gespeichert.')) return;
-  clearInterval(run.t); run = null;
-  document.getElementById('runner').style.display = 'none';
-};
-document.getElementById('goal-save').onclick = async ()=>{
-  goal = {sessions: Number(document.getElementById('goal-sessions').value) || 0, minutes: Number(document.getElementById('goal-minutes').value) || 0};
-  await saveGoalData(); renderGoal();
-};
-
-document.getElementById('add-toggle').onclick = ()=>{
-  document.getElementById('add-form').classList.toggle('show');
-};
-
-document.getElementById('save-btn').onclick = async ()=>{
-  const name = document.getElementById('f-name').value.trim();
-  if(!name){ document.getElementById('f-name').focus(); return; }
-  const w = {
-    id: crypto.randomUUID(),
-    name,
-    art: document.getElementById('f-art').value,
-    quelle: document.getElementById('f-quelle').value,
-    dauer: Number(document.getElementById('f-dauer').value) || 0,
-    intensitaet: document.getElementById('f-intensitaet').value,
-    trainer: document.getElementById('f-trainer').value.trim(),
-    link: document.getElementById('f-link').value.trim(),
-    phase: document.getElementById('f-phase').value
-  };
-  workouts.push(w);
-  await saveWorkouts();
-  ['f-name','f-dauer','f-trainer','f-link'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('add-form').classList.remove('show');
-  renderTrainerSelect();
-  updateMatchCount();
-};
-
-document.getElementById('export-btn').onclick = ()=>{
-  const backup = {exportedAt: new Date().toISOString(), workouts, scheduled, history: hist, goal};
-  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'trainingsauswahl-backup-' + new Date().toISOString().slice(0,10) + '.json';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-};
-
-document.getElementById('import-btn').onclick = ()=> document.getElementById('import-file').click();
-document.getElementById('import-file').onchange = (e)=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = async (ev)=>{
-    try{
-      const data = JSON.parse(ev.target.result);
-      if(!Array.isArray(data.workouts)) throw new Error('ungültiges Format');
-      workouts = data.workouts;
-      scheduled = Array.isArray(data.scheduled) ? data.scheduled : [];
-      hist = Array.isArray(data.history) ? data.history : hist;
-      if(data.goal) goal = data.goal;
-      await saveWorkouts();
-      await saveScheduled();
-      renderTrainerSelect();
-      updateMatchCount();
-      await saveHist(); await saveGoalData();
-      renderUpcoming(); renderHistory(); renderGoal();
-    }catch(err){
-      alert('Backup konnte nicht gelesen werden: ' + err.message);
-    }
-  };
-  reader.readAsText(file);
-  e.target.value = '';
-};
-
-function showLogin(msg){
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('login').style.display = 'flex';
-  document.getElementById('login-error').textContent = msg || '';
-}
-function showApp(){
-  document.getElementById('login').style.display = 'none';
-  document.getElementById('app').style.display = '';
-}
-
-async function startApp(){
-  await Promise.all([loadWorkouts(), loadScheduled(), loadHist(), loadGoal()]);
-  renderChips('chips-art', ART_OPTIONS, 'art');
-  renderChips('chips-quelle', QUELLE_OPTIONS, 'quelle');
-  renderChips('chips-intensitaet', INTENSITAET_OPTIONS, 'intensitaet');
-  renderChips('chips-phase', PHASE_ORDER, 'phase');
-  renderTrainerSelect();
-  updateMatchCount();
-  renderUpcoming(); renderHistory(); renderGoal(); renderPlan();
-  if(!startApp.timer) startApp.timer = setInterval(tick, 1000);
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  document.getElementById('schedule-input').min = now.toISOString().slice(0,16);
-  showApp();
-}
-
-document.getElementById('login-form').onsubmit = async (e)=>{
-  e.preventDefault();
-  const btn = document.getElementById('login-btn');
-  const email = document.getElementById('login-email').value.trim();
-  const pw = document.getElementById('login-pw').value;
-  btn.disabled = true;
-  document.getElementById('login-error').textContent = '';
-  try{
-    await login(email, pw);
-  }catch(err){
-    showLogin(String(err.message).startsWith('auth ')
-      ? 'E-Mail oder Passwort stimmt nicht.'
-      : 'Keine Verbindung. Bitte später erneut versuchen.');
-    btn.disabled = false;
-    return;
-  }
-  document.getElementById('login-pw').value = '';
-  try{ await startApp(); }
-  catch(err){ console.error(err); showLogin('Fehler beim Laden der Daten.'); }
-  btn.disabled = false;
-};
-
-document.getElementById('logout-btn').onclick = ()=>{
-  if(session){
-    fetch(SUPABASE_URL + "/auth/v1/logout", {
-      method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + session.access_token }
-    }).catch(()=>{});
-  }
-  saveSession(null);
-  workouts = [];
-  scheduled = [];
-  hist = [];
-  plan = [];
-  if(run){ clearInterval(run.t); run = null; document.getElementById('runner').style.display = 'none'; }
-  renderPlan();
-  showLogin();
-};
-
-(async function init(){
-  session = loadSession();
-  if(!session){ showLogin(); return; }
-  try{
-    if(session.expires_at - Date.now() < 60000) await refreshOnce();
-    await startApp();
-  }catch(e){
-    console.error(e);
-    showLogin('Bitte erneut anmelden.');
-  }
-})();
-</script>
-</body>
-</html>
+      <div class="result-actions" style="margin-top:8px"><button class="btn-ghost" data-a="all">Komplett wiederholen
