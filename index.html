@@ -176,6 +176,24 @@
   .login{display:none;min-height:70vh;align-items:center;justify-content:center;padding:16px;}
   .login-box{width:100%;max-width:360px;display:flex;flex-direction:column;gap:10px;}
   .login-error{color:var(--high);font-size:13px;min-height:18px;}
+
+  body{padding-bottom:90px;}
+  .goal{padding:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);margin-bottom:22px;}
+  .goal .label{margin-bottom:4px;}
+  .goal-txt{font-size:13px;color:var(--text-dim);line-height:1.6;}
+  .bar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin:8px 0;}
+  .bar>i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s;}
+  .checks{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0 8px;font-size:13.5px;color:var(--text-dim);}
+  .checks label{display:flex;gap:6px;align-items:center;cursor:pointer;}
+  .s-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .tag{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;font-weight:600;}
+  .ph-sel{padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);font-size:11.5px;margin-right:4px;flex:none;}
+  .li-add{background:none;border:none;color:var(--accent);cursor:pointer;font-size:20px;padding:4px 8px;}
+  .bar-fixed{position:fixed;left:0;right:0;bottom:0;background:var(--surface-2);border-top:1px solid var(--border);padding:10px 16px;display:none;justify-content:space-between;align-items:center;z-index:5;font-size:14px;}
+  #runner{position:fixed;inset:0;background:var(--bg);z-index:10;display:none;flex-direction:column;justify-content:center;align-items:center;padding:24px;text-align:center;gap:14px;}
+  .timer{font-family:'Space Grotesk',sans-serif;font-size:64px;font-weight:700;}
+  #toast{position:fixed;top:12px;left:50%;transform:translateX(-50%);max-width:92vw;background:var(--accent);color:var(--accent-text);padding:12px 16px;border-radius:var(--radius);font-weight:600;font-size:14px;z-index:20;display:none;cursor:pointer;}
+  details summary{cursor:pointer;line-height:1.5;}
 </style>
 </head>
 <body>
@@ -192,7 +210,21 @@
 
 <div class="wrap" id="app" style="display:none">
   <h1>Trainingsauswahl</h1>
-  <p class="sub">Filtern statt suchen. Wähle Art, Dauer, Intensität, Quelle oder Trainer:in — und lass dir ein passendes Workout auslosen.</p>
+  <p class="sub">Filtern statt suchen: lass dir ein Workout auslosen oder stelle es dir aus den Einträgen selbst zusammen.</p>
+
+  <div class="goal">
+    <div class="label">Wochenziel</div>
+    <div class="goal-txt" id="goal-status"></div>
+    <div class="bar"><i id="goal-bar"></i></div>
+    <div class="goal-txt" id="goal-left"></div>
+    <details style="margin-top:8px"><summary class="goal-txt">Ziel festlegen</summary>
+      <div class="row" style="margin-top:8px">
+        <input class="num" type="number" id="goal-sessions" placeholder="Einh." min="0">
+        <input class="num" type="number" id="goal-minutes" placeholder="Min." min="0">
+        <button class="btn-ghost" id="goal-save">Speichern</button>
+      </div>
+    </details>
+  </div>
 
   <section>
     <div class="label">Art</div>
@@ -210,6 +242,11 @@
   </section>
 
   <section>
+    <div class="label">Teil</div>
+    <div class="chips" id="chips-phase"></div>
+  </section>
+
+  <section>
     <div class="label">Dauer (Minuten)</div>
     <div class="row">
       <input class="num" type="number" id="dauer-min" placeholder="min" min="0">
@@ -223,18 +260,32 @@
     <select id="trainer-select"><option value="">Alle</option></select>
   </section>
 
+  <div class="checks"><span>Beim Auslosen dazu:</span>
+    <label><input type="checkbox" class="extra" value="Warm-up"> Warm-up</label>
+    <label><input type="checkbox" class="extra" value="Cool-down"> Cool-down</label>
+    <label><input type="checkbox" class="extra" value="Stretching"> Stretching</label>
+  </div>
   <button class="pick-btn" id="pick-btn">Workout auslosen</button>
   <div class="count" id="match-count"></div>
 
   <div class="result" id="result">
-    <div class="result-name" id="result-name"></div>
+    <div class="result-name">Mein Workout</div>
     <div class="result-meta" id="result-meta"></div>
-    <div class="result-actions">
-      <button class="btn-ghost" id="reroll-btn">Nochmal</button>
-      <a class="btn-ghost" id="open-link" href="#" target="_blank" rel="noopener" style="display:none;">Öffnen</a>
+    <div id="s-list"></div>
+    <div class="result-actions" style="flex-wrap:wrap">
+      <button class="save-btn" style="padding:9px 18px" id="start-btn">Jetzt starten</button>
+      <button class="btn-ghost" id="reroll-btn">Nochmal auslosen</button>
+      <button class="btn-ghost" id="clear-btn">Leeren</button>
     </div>
-    <div class="schedule-row">
+    <div class="schedule-row" style="flex-wrap:wrap">
       <input type="datetime-local" id="schedule-input" class="dt-input">
+      <select id="remind-sel" style="flex:0 0 auto">
+        <option value="0">keine Erinnerung</option>
+        <option value="5">5 Min vorher</option>
+        <option value="10" selected>10 Min vorher</option>
+        <option value="30">30 Min vorher</option>
+        <option value="60">1 Std vorher</option>
+      </select>
       <button class="btn-ghost" id="schedule-btn">Termin planen</button>
     </div>
   </div>
@@ -243,6 +294,11 @@
 
   <div class="label" id="upcoming-label">Anstehend</div>
   <div id="upcoming-list"></div>
+
+  <hr>
+
+  <div class="label" id="hist-label">Historie</div>
+  <div id="hist-list"></div>
 
   <hr>
 
@@ -277,6 +333,12 @@
         <option value="hoch">hoch</option>
       </select>
     </div>
+    <select id="f-phase">
+      <option>Hauptteil</option>
+      <option>Warm-up</option>
+      <option>Cool-down</option>
+      <option>Stretching</option>
+    </select>
     <input type="text" id="f-trainer" placeholder="Trainer:in (optional)">
     <input type="text" id="f-link" placeholder="Link (optional)">
     <button class="save-btn" id="save-btn">Eintrag speichern</button>
@@ -290,6 +352,17 @@
     <button class="btn-ghost" id="logout-btn">Abmelden</button>
     <input type="file" id="import-file" accept="application/json" style="display:none">
   </div>
+</div>
+
+<div class="bar-fixed" id="sbar"><span id="sbar-txt"></span><button class="save-btn" style="padding:8px 14px" id="sbar-go">Ansehen</button></div>
+<div id="toast" onclick="this.style.display='none'"></div>
+<div id="runner">
+  <div class="tag" id="r-step"></div>
+  <h1 id="r-name" style="margin:0"></h1>
+  <div class="result-meta" id="r-meta"></div>
+  <div class="timer" id="r-timer">00:00</div>
+  <a class="btn-ghost" id="r-link" href="#" target="_blank" rel="noopener" style="display:none">Öffnen</a>
+  <div class="row"><button class="save-btn" style="padding:12px 28px" id="r-next">Weiter</button><button class="btn-ghost" id="r-cancel">Abbrechen</button></div>
 </div>
 
 <script type="module">
@@ -394,6 +467,7 @@ const ART_OPTIONS = ["HIIT","Kraft","Cardio","Kettlebell","Mobility / Yoga","Son
 const QUELLE_OPTIONS = ["FitOn","YouTube","Crossrope","Nike Training Club","Sonstiges"];
 const INTENSITAET_OPTIONS = ["niedrig","mittel","hoch"];
 const INTENSITAET_COLOR = {niedrig:"var(--low)", mittel:"var(--mid)", hoch:"var(--high)"};
+const PHASE_ORDER = ["Warm-up","Hauptteil","Cool-down","Stretching"];
 
 const STARTER_DATA = [
   {id:crypto.randomUUID(), name:"Kettlebell Flow (Beispiel – bitte anpassen)", art:"Kettlebell", quelle:"YouTube", dauer:20, intensitaet:"mittel", trainer:"", link:""},
@@ -404,8 +478,11 @@ const STARTER_DATA = [
 
 let workouts = [];
 let scheduled = [];
-let currentPick = null;
-let filters = {art:new Set(), quelle:new Set(), intensitaet:new Set(), min:null, max:null, trainer:""};
+let plan = [];
+let hist = [];
+let goal = {sessions:0, minutes:0};
+let run = null;
+let filters = {art:new Set(), quelle:new Set(), intensitaet:new Set(), phase:new Set(), min:null, max:null, trainer:""};
 
 async function loadScheduled(){
   try{
@@ -432,8 +509,8 @@ function buildICS(entry){
     'DTSTART:'+fmtICSDate(start),
     'DTEND:'+fmtICSDate(end),
     'SUMMARY:'+entry.name,
-    'DESCRIPTION:'+entry.art+' \\u00b7 '+entry.quelle+' \\u00b7 '+entry.dauer+' Min',
-    'END:VEVENT','END:VCALENDAR'
+    'DESCRIPTION:'+(entry.items ? entry.items.map(x=>x.phase+': '+x.name).join(' | ') : entry.art+' - '+entry.quelle+' - '+entry.dauer+' Min'),
+    ...(entry.remind ? ['BEGIN:VALARM','TRIGGER:-PT'+entry.remind+'M','ACTION:DISPLAY','DESCRIPTION:Workout','END:VALARM'] : []),'END:VEVENT','END:VCALENDAR'
   ];
   return lines.join('\r\n');
 }
@@ -447,6 +524,70 @@ function downloadICS(entry){
   URL.revokeObjectURL(url);
 }
 
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ph = w => w.phase || 'Hauptteil';
+const total = a => a.reduce((s,x)=> s + (x.dauer||0), 0);
+const rnd = a => a[Math.floor(Math.random()*a.length)];
+const snap = w => ({name:w.name, art:w.art, quelle:w.quelle, dauer:w.dauer||0, intensitaet:w.intensitaet, trainer:w.trainer||'', link:w.link||'', phase:ph(w)});
+const sortPlan = a => [...a].sort((x,y)=> PHASE_ORDER.indexOf(x.phase) - PHASE_ORDER.indexOf(y.phase));
+function sessName(items){
+  const m = items.find(x=>x.phase==='Hauptteil') || items[0];
+  return m.name + (items.length>1 ? ` (+${items.length-1})` : '');
+}
+function itemsOf(s){
+  return s.items || [snap(workouts.find(w=>w.id===s.workoutId) || {name:s.name, art:s.art, quelle:s.quelle, dauer:s.dauer})];
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(showToast.t);
+  showToast.t = setTimeout(()=>{ t.style.display='none'; }, 9000);
+}
+
+// ----- Mein Workout (Zusammenstellung) -----
+function addToPlan(w){ plan = sortPlan([...plan, snap(w)]); renderPlan(); }
+function renderPlan(){
+  const r = document.getElementById('result');
+  const tot = total(plan);
+  r.classList.toggle('show', plan.length > 0);
+  document.getElementById('result-meta').textContent = plan.length + (plan.length===1 ? ' Teil' : ' Teile') + ' · ' + tot + ' Min';
+  const el = document.getElementById('s-list');
+  el.innerHTML = '';
+  plan.forEach((x,i)=>{
+    const d = document.createElement('div');
+    d.className = 's-item';
+    d.innerHTML = `<div class="li-main"><div class="tag">${esc(x.phase)}</div><div class="li-name">${esc(x.name)}</div>
+      <div class="li-meta">${esc(x.art)} · ${esc(x.quelle)} · ${x.dauer} Min${x.intensitaet ? ' · '+esc(x.intensitaet) : ''}${x.trainer ? ' · '+esc(x.trainer) : ''}</div></div>
+      <div style="flex-shrink:0">${x.link ? `<a class="up-btn" target="_blank" rel="noopener" href="${esc(x.link)}">Öffnen</a> ` : ''}<button class="li-del">×</button></div>`;
+    d.querySelector('.li-del').onclick = ()=>{ plan.splice(i,1); renderPlan(); };
+    el.appendChild(d);
+  });
+  document.getElementById('sbar').style.display = plan.length ? 'flex' : 'none';
+  document.getElementById('sbar-txt').textContent = 'Mein Workout: ' + plan.length + ' · ' + tot + ' Min';
+}
+
+// ----- Geplante Workouts, Countdown, Erinnerung -----
+function fmtLeft(ms){
+  const s = Math.floor(ms/1000);
+  if(s <= 0) return 'Startzeit erreicht';
+  if(s < 3600) return 'in ' + pad(Math.floor(s/60)) + ':' + pad(s%60);
+  const hh = Math.floor(s/3600), d = Math.floor(hh/24);
+  return d ? `in ${d} T ${hh%24} Std` : `in ${hh} Std ${Math.floor(s%3600/60)} Min`;
+}
+function tick(){
+  const now = Date.now();
+  document.querySelectorAll('.cd').forEach(el=>{ el.textContent = fmtLeft(new Date(el.dataset.when) - now); });
+  scheduled.forEach(s=>{
+    const t = new Date(s.when).getTime();
+    if(s.remind && !s.reminded && now >= t - s.remind*60000 && now < t + 3600000){
+      s.reminded = true;
+      saveScheduled();
+      const msg = `Gleich geplant: ${s.name} (${new Date(s.when).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr)`;
+      showToast(msg);
+      if('Notification' in window && Notification.permission === 'granted') new Notification('Workout-Erinnerung', {body: msg});
+    }
+  });
+}
 function renderUpcoming(){
   const el = document.getElementById('upcoming-list');
   const now = new Date();
@@ -455,7 +596,7 @@ function renderUpcoming(){
     .sort((a,b)=> new Date(a.when) - new Date(b.when));
   document.getElementById('upcoming-label').textContent = upcoming.length ? `Anstehend (${upcoming.length})` : 'Anstehend';
   if(upcoming.length === 0){
-    el.innerHTML = '<div class="empty">Noch nichts geplant. Wähle oben ein Workout aus und plane einen Termin.</div>';
+    el.innerHTML = '<div class="empty">Noch nichts geplant. Stelle oben ein Workout zusammen und plane einen Termin.</div>';
     return;
   }
   el.innerHTML = '';
@@ -466,14 +607,17 @@ function renderUpcoming(){
     item.className = 'upcoming-item';
     item.innerHTML = `
       <div class="li-main">
-        <div class="li-name">${s.name}</div>
-        <div class="up-when">${whenStr}</div>
+        <div class="li-name">${esc(s.name)}</div>
+        <div class="up-when">${whenStr} · <span class="cd" data-when="${esc(s.when)}"></span></div>
+        <div class="li-meta">${total(itemsOf(s))} Min${s.remind ? ' · Erinnerung '+s.remind+' Min vorher' : ''}</div>
       </div>
       <div class="up-actions">
+        <button class="up-btn" data-act="go">Starten</button>
         <button class="up-btn" data-act="ics">Kalender</button>
-        <button class="up-btn" data-act="del">Entfernen</button>
+        <button class="up-btn" data-act="del">×</button>
       </div>
     `;
+    item.querySelector('[data-act="go"]').onclick = ()=> startRun(itemsOf(s), s.id);
     item.querySelector('[data-act="ics"]').onclick = ()=> downloadICS(s);
     item.querySelector('[data-act="del"]').onclick = async ()=>{
       scheduled = scheduled.filter(x=>x.id !== s.id);
@@ -482,6 +626,134 @@ function renderUpcoming(){
     };
     el.appendChild(item);
   });
+  tick();
+}
+
+// ----- Workout durchführen -----
+function startRun(items, schedId){
+  if(!items.length) return;
+  run = {items: items.map(x=>({...x})), i:0, schedId, done:[], end:0, t:null};
+  document.getElementById('runner').style.display = 'flex';
+  runStep();
+}
+function runStep(){
+  const x = run.items[run.i];
+  run.end = Date.now() + (x.dauer||0)*60000;
+  run.buzzed = false;
+  document.getElementById('r-step').textContent = `Teil ${run.i+1} von ${run.items.length} · ${x.phase}`;
+  document.getElementById('r-name').textContent = x.name;
+  document.getElementById('r-meta').textContent = [x.art, x.quelle, x.trainer].filter(Boolean).join(' · ');
+  const a = document.getElementById('r-link');
+  if(x.link){ a.href = x.link; a.style.display = 'inline-flex'; } else a.style.display = 'none';
+  document.getElementById('r-next').textContent = run.i === run.items.length-1 ? 'Fertig' : 'Weiter';
+  clearInterval(run.t);
+  runTick();
+  run.t = setInterval(runTick, 500);
+}
+function runTick(){
+  const left = Math.max(0, Math.ceil((run.end - Date.now())/1000));
+  document.getElementById('r-timer').textContent = pad(Math.floor(left/60)) + ':' + pad(left%60);
+  if(left === 0 && !run.buzzed){ run.buzzed = true; if(navigator.vibrate) navigator.vibrate(300); }
+}
+async function finishRun(){
+  clearInterval(run.t);
+  const items = run.done, schedId = run.schedId;
+  hist.push({id:crypto.randomUUID(), at:new Date().toISOString(), name:sessName(items), items, dauer:total(items)});
+  await saveHist();
+  if(schedId){ scheduled = scheduled.filter(x=>x.id !== schedId); await saveScheduled(); }
+  run = null;
+  document.getElementById('runner').style.display = 'none';
+  renderUpcoming(); renderHistory(); renderGoal();
+  showToast('Workout gespeichert – stark!');
+}
+
+// ----- Historie -----
+async function loadHist(){
+  try{ const r = await storage.get('history'); hist = r ? JSON.parse(r.value) : []; }
+  catch(e){ console.error(e); hist = []; }
+}
+async function saveHist(){
+  try{ await storage.set('history', JSON.stringify(hist)); } catch(e){ console.error(e); }
+}
+function renderHistory(){
+  const el = document.getElementById('hist-list');
+  document.getElementById('hist-label').textContent = hist.length ? `Historie (${hist.length})` : 'Historie';
+  if(!hist.length){ el.innerHTML = '<div class="empty">Noch keine abgeschlossenen Workouts.</div>'; return; }
+  el.innerHTML = '';
+  let last = '';
+  [...hist].sort((a,b)=> b.at.localeCompare(a.at)).slice(0,60).forEach(e=>{
+    const d = new Date(e.at);
+    const day = d.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'2-digit', year:'numeric'});
+    if(day !== last){
+      const t = document.createElement('div');
+      t.className = 'label'; t.style.marginTop = '14px'; t.textContent = day;
+      el.appendChild(t); last = day;
+    }
+    const box = document.createElement('div');
+    box.style.cssText = 'border-bottom:1px solid var(--border);padding:10px 4px';
+    box.innerHTML = `<details><summary><span class="li-name">${esc(e.name)}</span> <span class="li-meta">· ${e.dauer} Min · ${d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</span></summary><div class="hbody"></div></details>
+      <div class="result-actions" style="margin-top:8px"><button class="btn-ghost" data-a="all">Komplett wiederholen</button><button class="btn-ghost" data-a="del">Löschen</button></div>`;
+    const body = box.querySelector('.hbody');
+    e.items.forEach(x=>{
+      const r = document.createElement('div');
+      r.className = 's-item';
+      r.innerHTML = `<div class="li-main"><span class="tag">${esc(x.phase)}</span> <span class="li-name">${esc(x.name)}</span><div class="li-meta">${x.dauer} Min</div></div><button class="up-btn">+ Teil</button>`;
+      r.querySelector('button').onclick = ()=>{ plan = sortPlan([...plan, {...x}]); renderPlan(); };
+      body.appendChild(r);
+    });
+    box.querySelector('[data-a="all"]').onclick = ()=>{
+      plan = sortPlan(e.items.map(x=>({...x}))); renderPlan();
+      document.getElementById('result').scrollIntoView({behavior:'smooth', block:'nearest'});
+    };
+    box.querySelector('[data-a="del"]').onclick = async ()=>{
+      if(!confirm('Diesen Historien-Eintrag löschen?')) return;
+      hist = hist.filter(x=>x.id !== e.id);
+      await saveHist(); renderHistory(); renderGoal();
+    };
+    el.appendChild(box);
+  });
+}
+
+// ----- Wochenziel -----
+async function loadGoal(){
+  try{ const r = await storage.get('goal'); goal = r ? JSON.parse(r.value) : {sessions:0, minutes:0}; }
+  catch(e){ console.error(e); }
+  document.getElementById('goal-sessions').value = goal.sessions || '';
+  document.getElementById('goal-minutes').value = goal.minutes || '';
+}
+async function saveGoalData(){
+  try{ await storage.set('goal', JSON.stringify(goal)); } catch(e){ console.error(e); }
+}
+function renderGoal(){
+  const ws = new Date(); ws.setHours(0,0,0,0); ws.setDate(ws.getDate() - ((ws.getDay()+6)%7));
+  const wk = hist.filter(e=> new Date(e.at) >= ws);
+  const n = wk.length, m = total(wk);
+  const st = document.getElementById('goal-status'), left = document.getElementById('goal-left'), bar = document.getElementById('goal-bar');
+  const parts = [], ratios = [], miss = [];
+  if(goal.sessions){ parts.push(`${n} von ${goal.sessions} Einheiten`); ratios.push(n/goal.sessions); if(n < goal.sessions) miss.push(`${goal.sessions-n} Einheit(en)`); }
+  if(goal.minutes){ parts.push(`${m} von ${goal.minutes} Min`); ratios.push(m/goal.minutes); if(m < goal.minutes) miss.push(`${goal.minutes-m} Min`); }
+  if(!parts.length){ st.textContent = `Diese Woche: ${n} Einheiten · ${m} Min. Lege unten ein Ziel fest.`; left.textContent = ''; bar.style.width = '0'; return; }
+  st.textContent = 'Diese Woche: ' + parts.join(' · ');
+  bar.style.width = Math.min(100, Math.round(Math.min(...ratios)*100)) + '%';
+  const daysLeft = 7 - ((new Date().getDay()+6)%7);
+  let txt = miss.length ? `Noch ${miss.join(' und ')} bis zum Ziel – ${daysLeft} Tag${daysLeft===1?'':'e'} übrig (inkl. heute).` : 'Wochenziel erreicht!';
+  if(goal.minutes && m < goal.minutes) txt += ` Das sind ca. ${Math.ceil((goal.minutes-m)/daysLeft)} Min pro Tag.`;
+  left.textContent = txt;
+}
+
+function pickRandom(){
+  let pool = workouts.filter(matches);
+  if(!filters.phase.size) pool = pool.filter(w=> ph(w) === 'Hauptteil');
+  if(!pool.length){ showToast('Keine Treffer mit diesen Filtern'); return; }
+  const parts = [rnd(pool)], missing = [];
+  document.querySelectorAll('.extra:checked').forEach(c=>{
+    const p = workouts.filter(w=> ph(w) === c.value);
+    if(p.length) parts.push(rnd(p)); else missing.push(c.value);
+  });
+  plan = sortPlan(parts.map(snap));
+  renderPlan();
+  if(missing.length) showToast('Noch keine Einträge für: ' + missing.join(', '));
+  document.getElementById('result').scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
 async function loadWorkouts(){
@@ -530,6 +802,7 @@ function matches(w){
   if(filters.min!==null && !isNaN(filters.min) && w.dauer < filters.min) return false;
   if(filters.max!==null && !isNaN(filters.max) && w.dauer > filters.max) return false;
   if(filters.trainer && w.trainer !== filters.trainer) return false;
+  if(filters.phase.size && !filters.phase.has(ph(w))) return false;
   return true;
 }
 
@@ -539,25 +812,6 @@ function updateMatchCount(){
     n === 0 ? 'Keine Treffer mit diesen Filtern' :
     n === 1 ? '1 Workout passt' : n + ' Workouts passen';
   renderList();
-}
-
-function pickRandom(){
-  const pool = workouts.filter(matches);
-  const resultEl = document.getElementById('result');
-  if(pool.length === 0){
-    resultEl.classList.remove('show');
-    return;
-  }
-  const w = pool[Math.floor(Math.random()*pool.length)];
-  currentPick = w;
-  document.getElementById('result-name').textContent = w.name;
-  document.getElementById('result-meta').innerHTML =
-    `${w.art} · ${w.quelle} · ${w.dauer} Min · <span class="dot" style="background:${INTENSITAET_COLOR[w.intensitaet]}"></span>${w.intensitaet}` +
-    (w.trainer ? ` · ${w.trainer}` : '');
-  const linkEl = document.getElementById('open-link');
-  if(w.link){ linkEl.href = w.link; linkEl.style.display='inline-flex'; }
-  else{ linkEl.style.display='none'; }
-  resultEl.classList.add('show');
 }
 
 function renderList(){
@@ -578,8 +832,14 @@ function renderList(){
         <div class="li-name">${w.name}</div>
         <div class="li-meta"><span class="dot" style="background:${INTENSITAET_COLOR[w.intensitaet]}"></span>${w.art} · ${w.quelle} · ${w.dauer} Min${w.trainer ? ' · '+w.trainer : ''}</div>
       </div>
-      <button class="li-del" data-id="${w.id}">×</button>
+      <div style="display:flex;align-items:center;flex-shrink:0">
+        <select class="ph-sel">${PHASE_ORDER.map(p=>`<option${p===ph(w)?' selected':''}>${p}</option>`).join('')}</select>
+        <button class="li-add" title="Zum Workout hinzufügen">+</button>
+        <button class="li-del" data-id="${w.id}">×</button>
+      </div>
     `;
+    item.querySelector('.ph-sel').onchange = async e=>{ w.phase = e.target.value; await saveWorkouts(); updateMatchCount(); };
+    item.querySelector('.li-add').onclick = ()=> addToPlan(w);
     item.querySelector('.li-del').onclick = async ()=>{
       workouts = workouts.filter(x=>x.id !== w.id);
       await saveWorkouts();
@@ -598,20 +858,30 @@ document.getElementById('reroll-btn').onclick = pickRandom;
 
 document.getElementById('schedule-btn').onclick = async ()=>{
   const val = document.getElementById('schedule-input').value;
-  if(!val || !currentPick) return;
-  const entry = {
-    id: crypto.randomUUID(),
-    workoutId: currentPick.id,
-    name: currentPick.name,
-    art: currentPick.art,
-    quelle: currentPick.quelle,
-    dauer: currentPick.dauer,
-    when: val
-  };
-  scheduled.push(entry);
+  if(!val || !plan.length) return;
+  const remind = Number(document.getElementById('remind-sel').value);
+  if(remind && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  scheduled.push({id:crypto.randomUUID(), name:sessName(plan), items:plan.map(x=>({...x})), dauer:total(plan), when:val, remind});
   await saveScheduled();
   renderUpcoming();
   document.getElementById('schedule-input').value = '';
+};
+document.getElementById('start-btn').onclick = ()=> startRun(plan);
+document.getElementById('clear-btn').onclick = ()=>{ plan = []; renderPlan(); };
+document.getElementById('sbar-go').onclick = ()=> document.getElementById('result').scrollIntoView({behavior:'smooth', block:'center'});
+document.getElementById('r-next').onclick = async ()=>{
+  run.done.push(run.items[run.i]);
+  if(run.i < run.items.length-1){ run.i++; runStep(); return; }
+  await finishRun();
+};
+document.getElementById('r-cancel').onclick = ()=>{
+  if(!confirm('Workout abbrechen? Es wird nicht in der Historie gespeichert.')) return;
+  clearInterval(run.t); run = null;
+  document.getElementById('runner').style.display = 'none';
+};
+document.getElementById('goal-save').onclick = async ()=>{
+  goal = {sessions: Number(document.getElementById('goal-sessions').value) || 0, minutes: Number(document.getElementById('goal-minutes').value) || 0};
+  await saveGoalData(); renderGoal();
 };
 
 document.getElementById('add-toggle').onclick = ()=>{
@@ -629,7 +899,8 @@ document.getElementById('save-btn').onclick = async ()=>{
     dauer: Number(document.getElementById('f-dauer').value) || 0,
     intensitaet: document.getElementById('f-intensitaet').value,
     trainer: document.getElementById('f-trainer').value.trim(),
-    link: document.getElementById('f-link').value.trim()
+    link: document.getElementById('f-link').value.trim(),
+    phase: document.getElementById('f-phase').value
   };
   workouts.push(w);
   await saveWorkouts();
@@ -640,7 +911,7 @@ document.getElementById('save-btn').onclick = async ()=>{
 };
 
 document.getElementById('export-btn').onclick = ()=>{
-  const backup = {exportedAt: new Date().toISOString(), workouts, scheduled};
+  const backup = {exportedAt: new Date().toISOString(), workouts, scheduled, history: hist, goal};
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -661,11 +932,14 @@ document.getElementById('import-file').onchange = (e)=>{
       if(!Array.isArray(data.workouts)) throw new Error('ungültiges Format');
       workouts = data.workouts;
       scheduled = Array.isArray(data.scheduled) ? data.scheduled : [];
+      hist = Array.isArray(data.history) ? data.history : hist;
+      if(data.goal) goal = data.goal;
       await saveWorkouts();
       await saveScheduled();
       renderTrainerSelect();
       updateMatchCount();
-      renderUpcoming();
+      await saveHist(); await saveGoalData();
+      renderUpcoming(); renderHistory(); renderGoal();
     }catch(err){
       alert('Backup konnte nicht gelesen werden: ' + err.message);
     }
@@ -685,13 +959,15 @@ function showApp(){
 }
 
 async function startApp(){
-  await Promise.all([loadWorkouts(), loadScheduled()]);
+  await Promise.all([loadWorkouts(), loadScheduled(), loadHist(), loadGoal()]);
   renderChips('chips-art', ART_OPTIONS, 'art');
   renderChips('chips-quelle', QUELLE_OPTIONS, 'quelle');
   renderChips('chips-intensitaet', INTENSITAET_OPTIONS, 'intensitaet');
+  renderChips('chips-phase', PHASE_ORDER, 'phase');
   renderTrainerSelect();
   updateMatchCount();
-  renderUpcoming();
+  renderUpcoming(); renderHistory(); renderGoal(); renderPlan();
+  if(!startApp.timer) startApp.timer = setInterval(tick, 1000);
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   document.getElementById('schedule-input').min = now.toISOString().slice(0,16);
@@ -730,8 +1006,10 @@ document.getElementById('logout-btn').onclick = ()=>{
   saveSession(null);
   workouts = [];
   scheduled = [];
-  currentPick = null;
-  document.getElementById('result').classList.remove('show');
+  hist = [];
+  plan = [];
+  if(run){ clearInterval(run.t); run = null; document.getElementById('runner').style.display = 'none'; }
+  renderPlan();
   showLogin();
 };
 
